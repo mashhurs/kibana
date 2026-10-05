@@ -35,6 +35,27 @@ export const configSchema = schema.object({
     enabled: schema.boolean({ defaultValue: true }),
     stream_definitions: schema.arrayOf(schema.any(), { defaultValue: [] }),
   }),
+  /**
+   * The per-project wrap key Kibana seals destination credentials with before
+   * `PUT /v1/units/<unit-id>`. `path` is where Secret `wrap-<project_id>`,
+   * written by project-controller, is mounted read-only. When it is unset no
+   * sealing is possible, and publishing a unit that carries secrets fails
+   * rather than sending plaintext to the distributor.
+   */
+  wrapKey: schema.object(
+    {
+      path: schema.maybe(schema.string({ maxLength: 4096 })),
+      /**
+       * Project the sealed blob is bound to, as the AEAD's additional
+       * authenticated data. Defaults to the serverless project id from the
+       * cloud plugin; set it explicitly for local development, where there is
+       * no project id and the distributor takes `target_id` from the client
+       * certificate instead (`dev` against the kind Tiltfile).
+       */
+      targetId: schema.maybe(schema.string({ maxLength: 256 })),
+    },
+    { defaultValue: {} }
+  ),
   workers: schema.object({
     patternExtraction: schema.object({
       enabled: schema.boolean({ defaultValue: true }),

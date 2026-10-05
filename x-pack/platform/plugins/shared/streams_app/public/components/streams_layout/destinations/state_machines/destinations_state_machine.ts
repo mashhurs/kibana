@@ -81,7 +81,7 @@ export type DestinationsStateEvent =
   | { type: 'destination.view'; destinationId: string }
   | { type: 'storageKind.select'; storageKind: DestinationStorageKind }
   | { type: 'destinationName.change'; destinationName: string }
-  | { type: 'elasticsearch.change'; index?: string; indexPatterns?: string }
+  | { type: 'elasticsearch.change'; index?: string; indexPatterns?: string; endpoint?: string; apiKey?: string }
   | { type: 'creationForm.blur' }
   | { type: 'modal.openCreate'; associatedUnconfiguredNodeId?: string }
   | { type: 'modal.closeCreate' }
@@ -230,6 +230,8 @@ export const destinationsStateMachine = setup({
           ...context.creationContext.formData.elasticsearch,
           ...(event.index !== undefined ? { index: event.index } : {}),
           ...(event.indexPatterns !== undefined ? { indexPatterns: event.indexPatterns } : {}),
+          ...(event.endpoint !== undefined ? { endpoint: event.endpoint } : {}),
+          ...(event.apiKey !== undefined ? { apiKey: event.apiKey } : {}),
         },
       };
       return {
@@ -264,6 +266,8 @@ export const destinationsStateMachine = setup({
         indexPatterns: indexUsesTemplate(index)
           ? parseIndexPatterns(elasticsearch.indexPatterns)
           : [],
+        endpoint: elasticsearch.endpoint.trim() || undefined,
+        apiKey: elasticsearch.apiKey.trim() || undefined,
       });
       const destination = toDestinationViewModel(unitDestination);
       if (!destination) {

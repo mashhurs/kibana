@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { EuiFieldText, EuiFormRow, EuiTextArea } from '@elastic/eui';
+import { EuiFieldPassword, EuiFieldText, EuiFormRow, EuiTextArea } from '@elastic/eui';
 import { i18n } from '@kbn/i18n';
 import {
   DESTINATION_INDEX_LABEL,
@@ -18,11 +18,15 @@ import type { DestinationCreationFormErrors } from './types';
 interface LocalElasticsearchFieldsProps {
   index: string;
   indexPatterns: string;
+  endpoint: string;
+  apiKey: string;
   indexError?: DestinationCreationFormErrors['index'];
   indexPatternsError?: DestinationCreationFormErrors['indexPatterns'];
   disabled: boolean;
   onIndexChange: (index: string) => void;
   onIndexPatternsChange: (indexPatterns: string) => void;
+  onEndpointChange: (endpoint: string) => void;
+  onApiKeyChange: (apiKey: string) => void;
   onBlur: () => void;
 }
 
@@ -51,11 +55,15 @@ const indexPatternsErrorText = (error: DestinationCreationFormErrors['indexPatte
 export const LocalElasticsearchFields = ({
   index,
   indexPatterns,
+  endpoint,
+  apiKey,
   indexError,
   indexPatternsError,
   disabled,
   onIndexChange,
   onIndexPatternsChange,
+  onEndpointChange,
+  onApiKeyChange,
   onBlur,
 }: LocalElasticsearchFieldsProps) => {
   const indexErrorMessage = indexErrorText(indexError);
@@ -111,6 +119,44 @@ export const LocalElasticsearchFields = ({
           />
         </EuiFormRow>
       )}
+      <EuiFormRow
+        fullWidth
+        label={i18n.translate('xpack.streams.destinations.endpointLabel', {
+          defaultMessage: 'Elasticsearch URL',
+        })}
+        helpText={i18n.translate('xpack.streams.destinations.endpointHelpDescription', {
+          defaultMessage: 'Leave empty to use the cluster default.',
+        })}
+      >
+        <EuiFieldText
+          fullWidth
+          value={endpoint}
+          disabled={disabled}
+          placeholder="https://my-cluster.es.io:9243"
+          onChange={(event) => onEndpointChange(event.target.value)}
+          onBlur={onBlur}
+          data-test-subj="streamsCreateDestinationEndpoint"
+        />
+      </EuiFormRow>
+      <EuiFormRow
+        fullWidth
+        label={i18n.translate('xpack.streams.destinations.apiKeyLabel', {
+          defaultMessage: 'API key',
+        })}
+        helpText={i18n.translate('xpack.streams.destinations.apiKeyHelpDescription', {
+          defaultMessage: 'Leave empty to use the cluster default credentials.',
+        })}
+      >
+        <EuiFieldPassword
+          fullWidth
+          value={apiKey}
+          disabled={disabled}
+          type="dual"
+          onChange={(event) => onApiKeyChange(event.target.value)}
+          onBlur={onBlur}
+          data-test-subj="streamsCreateDestinationApiKey"
+        />
+      </EuiFormRow>
     </>
   );
 };

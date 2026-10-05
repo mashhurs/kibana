@@ -1,4 +1,64 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(go mod *)",
+      "Bash(go build *)",
+      "Bash(tilt get *)",
+      "Bash(ls /Users/mashhur/Dev/elastic/streams/streams-controller/Tiltfile 2>/dev/null | head -3 *)",
+      "Read(//Users/mashhur/Dev/elastic/streams/streams-controller/**)",
+      "Bash(node scripts/type_check --project x-pack/platform/plugins/shared/streams_app/tsconfig.json)",
+      "Read(//Users/mashhur/Dev/elastic/streams/streams-transpiler/**)",
+      "Bash(go test *)",
+      "Bash(export GOPRIVATE=github.com/elastic/streams-controller)",
+      "Bash(/usr/local/go/bin/go test *)",
+      "Bash(go version *)",
+      "Bash(/opt/homebrew/bin/go test *)",
+      "Bash(GOFLAGS=\"\" /opt/homebrew/bin/go test ./internal/registry/)",
+      "Bash(cd /Users/mashhur/Dev/elastic/streams/streams-transpiler && \\\\ *)",
+      "Read(//tmp/**)",
+      "Bash(awk '{print $NF}')",
+      "Bash(tilt down *)",
+      "Bash(wait)",
+      "Bash(kill 47487 57347)",
+      "Bash(tilt up *)",
+      "Bash(echo \"Distributor tilt started: PID $!\")",
+      "Bash(echo \"Controller tilt started: PID $!\")",
+      "Bash(which -a tilt 2>/dev/null *)",
+      "Read(//opt/homebrew/Cellar/tilt/0.35.2/bin/**)",
+      "Bash(helm version *)",
+      "Bash(kill 96834 96889)",
+      "Bash(/opt/homebrew/bin/tilt down *)",
+      "Bash(helm version --short 2>&1 *)",
+      "Read(//opt/homebrew/Cellar/helm/**)",
+      "Bash(/opt/homebrew/bin/tilt version *)",
+      "Bash(helm template *)",
+      "Bash(/opt/homebrew/bin/tilt up *)",
+      "Bash(echo \"Controller PID: $!\")",
+      "Bash(xargs kill -9)",
+      "Bash(echo \"Distributor restarted: PID $!\")",
+      "Bash(kubectl --context kind-streams get streamunits -A)",
+      "Bash(kubectl --context kind-streams get pods -n project-dev)",
+      "Bash(kubectl --context kind-streams get configmaps -n project-dev)",
+      "Bash(kubectl --context kind-streams get configmap -n project-dev -l \"app.kubernetes.io/name=default\" -o yaml)",
+      "Bash(kubectl --context kind-streams get configmap default-config-535783e8178d675b -n project-dev -o jsonpath='{.data}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(kill 10694 11285)",
+      "Bash(GOPRIVATE=github.com/elastic/streams-controller go mod tidy)",
+      "Bash(GOPRIVATE=github.com/elastic/streams-controller go build ./...)",
+      "Bash(echo \"Distributor PID: $!\")",
+      "Bash(gh api *)",
+      "Bash(git -C /Users/mashhur/Dev/elastic/kibana status -sb)",
+      "Bash(git -C /Users/mashhur/Dev/elastic/kibana log --oneline -3 streams/seal-destination-credentials)",
+      "Bash(git -C /Users/mashhur/Dev/elastic/kibana ls-remote --heads origin seal-destination-credentials)",
+      "Bash(git -C /Users/mashhur/Dev/elastic/kibana remote -v)",
+      "Bash(awk '/^diff.*kibana/,/^diff.*\\(wrapkey|common|config|controllers|metrics|secret\\)\\\\//')",
+      "Bash(awk '/^diff.*internal\\\\/config\\\\/config.go/,/^diff.*config_test/')",
+      "Bash(awk '/^diff.*secret.go/,/^diff.*state_init/')"
+    ],
+    "additionalDirectories": [
+      "/Users/mashhur/Dev/elastic/streams/streams-config-distributor"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -15,8 +75,8 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(gh *)",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/strip-review-event.mjs"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/strip-review-event.mjs",
+            "if": "Bash(gh *)"
           }
         ]
       }

@@ -41,6 +41,8 @@ interface CreateDestinationModalProps {
     | 'destinationNameError'
     | 'elasticsearchIndex'
     | 'elasticsearchIndexPatterns'
+    | 'elasticsearchEndpoint'
+    | 'elasticsearchApiKey'
     | 'indexError'
     | 'indexPatternsError'
     | 'canCreateDestination'
@@ -51,6 +53,8 @@ interface CreateDestinationModalProps {
     | 'setCreateDestinationName'
     | 'setElasticsearchIndex'
     | 'setElasticsearchIndexPatterns'
+    | 'setElasticsearchEndpoint'
+    | 'setElasticsearchApiKey'
     | 'validateCreationForm'
   >;
   onClose: () => void;
@@ -64,6 +68,8 @@ export const CreateDestinationModal = ({ destinations, onClose }: CreateDestinat
     destinationNameError,
     elasticsearchIndex,
     elasticsearchIndexPatterns,
+    elasticsearchEndpoint,
+    elasticsearchApiKey,
     indexError,
     indexPatternsError,
     canCreateDestination,
@@ -74,6 +80,8 @@ export const CreateDestinationModal = ({ destinations, onClose }: CreateDestinat
     setCreateDestinationName,
     setElasticsearchIndex,
     setElasticsearchIndexPatterns,
+    setElasticsearchEndpoint,
+    setElasticsearchApiKey,
     validateCreationForm,
   } = destinations;
   const modalTitleId = useGeneratedHtmlId({ prefix: 'streamsCreateDestinationModalTitle' });
@@ -190,11 +198,15 @@ export const CreateDestinationModal = ({ destinations, onClose }: CreateDestinat
                         storageKind={storageKind}
                         index={elasticsearchIndex}
                         indexPatterns={elasticsearchIndexPatterns}
+                        endpoint={elasticsearchEndpoint}
+                        apiKey={elasticsearchApiKey}
                         indexError={indexError}
                         indexPatternsError={indexPatternsError}
                         disabled={isCreatingDestination}
                         onIndexChange={setElasticsearchIndex}
                         onIndexPatternsChange={setElasticsearchIndexPatterns}
+                        onEndpointChange={setElasticsearchEndpoint}
+                        onApiKeyChange={setElasticsearchApiKey}
                         onBlur={validateCreationForm}
                       />
                     )}

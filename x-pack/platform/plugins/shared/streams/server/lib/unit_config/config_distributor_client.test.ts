@@ -40,18 +40,13 @@ const unit: StreamsUnit.Configuration = {
 };
 
 const expectedYaml = YAML.stringify(unit);
+const KID = '20260921_101500_a3f19b2c';
 
-const hashPublishPayload = (unitYaml: string, credentials: UnitCredential[] = []): string => {
+const hashPublishPayload = (unitYaml: string, credentialFingerprint?: string): string => {
   const hash = createHash('sha256').update(unitYaml, 'utf8');
-  if (credentials.length > 0) {
+  if (credentialFingerprint) {
     hash.update('\n');
-    hash.update(
-      JSON.stringify(
-        [...credentials]
-          .sort((left, right) => left.name.localeCompare(right.name))
-          .map(({ name, ciphertext }) => [name, ciphertext])
-      )
-    );
+    hash.update(credentialFingerprint);
   }
   return hash.digest('hex');
 };
@@ -103,7 +98,7 @@ describe('createConfigDistributorClient', () => {
     );
   });
 
-  it('sends credentials as a sidecar after encrypting secrets under the project key', async () => {
+  it('sends credentials as a sidecar after sealing secrets under the wrap key', async () => {
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -111,10 +106,12 @@ describe('createConfigDistributorClient', () => {
     });
     const secrets = { es_api_key: 's3cret', s3_secret: 'bucket' };
     const credentials: UnitCredential[] = [
-      { name: 'es_api_key', ciphertext: 'cipher-es' },
-      { name: 's3_secret', ciphertext: 'cipher-s3' },
+      { name: 'es_api_key', kid: KID, iv: 'iv-es', ciphertext: 'cipher-es' },
+      { name: 's3_secret', kid: KID, iv: 'iv-s3', ciphertext: 'cipher-s3' },
     ];
-    const encryptCredentials = jest.fn().mockResolvedValue(credentials);
+    const encryptCredentials = jest
+      .fn()
+      .mockResolvedValue({ credentials, fingerprint: 'finger-print' });
     const { publish } = createConfigDistributorClient({
       config: { url: 'https://distributor.example:8443', ssl: {} },
       logger: loggerMock.create(),
@@ -128,7 +125,38 @@ describe('createConfigDistributorClient', () => {
     const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
     expect(body.unit_yaml).toEqual(expectedYaml);
     expect(body.credentials).toEqual(credentials);
-    expect(body.config_hash).toEqual(hashPublishPayload(expectedYaml, credentials));
+    expect(body.config_hash).toEqual(hashPublishPayload(expectedYaml, 'finger-print'));
+  });
+
+  it('hashes off the fingerprint, so re-sealing an unchanged secret stays unchanged', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' });
+    const secrets = { es_api_key: 's3cret' };
+    // AES-GCM is randomized: the same secret seals to different bytes each
+    // time. The config_hash must not move with it, or every publish rolls the
+    // collector Deployment.
+    const encryptCredentials = jest
+      .fn()
+      .mockResolvedValueOnce({
+        credentials: [{ name: 'es_api_key', kid: KID, iv: 'iv-1', ciphertext: 'cipher-1' }],
+        fingerprint: 'finger-print',
+      })
+      .mockResolvedValueOnce({
+        credentials: [{ name: 'es_api_key', kid: KID, iv: 'iv-2', ciphertext: 'cipher-2' }],
+        fingerprint: 'finger-print',
+      });
+    const { publish } = createConfigDistributorClient({
+      config: { url: 'https://distributor.example:8443', ssl: {} },
+      logger: loggerMock.create(),
+      hooks: { encryptCredentials },
+      fetchImpl,
+    });
+
+    await publish({ unitId: 'default', unit, secrets });
+    await publish({ unitId: 'default', unit, secrets });
+
+    const [first, second] = fetchImpl.mock.calls.map(([, init]) => JSON.parse(init.body));
+    expect(second.config_hash).toEqual(first.config_hash);
+    expect(second.credentials).not.toEqual(first.credentials);
   });
 
   it('publishes without a credentials sidecar when project-key encryption is not configured', async () => {

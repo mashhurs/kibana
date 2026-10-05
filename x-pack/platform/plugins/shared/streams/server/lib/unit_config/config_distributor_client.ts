@@ -13,7 +13,8 @@ import type { Logger } from '@kbn/logging';
 import { SslConfig, sslSchema } from '@kbn/server-http-tools';
 import type { StreamsUnit } from '@kbn/streams-schema';
 import { StatusError } from '../streams/errors/status_error';
-import type { UnitConfigHooks, UnitCredential, UnitValidationResult } from './types';
+import { credentialSealingUnavailable } from './seal_credentials';
+import type { SealedCredentials, UnitConfigHooks, UnitCredential, UnitValidationResult } from './types';
 
 export interface ConfigDistributorClientConfig {
   url?: string;
@@ -40,18 +41,18 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 const serializeUnitYaml = (unit: StreamsUnit.Configuration): string => YAML.stringify(unit);
 
-const hashUnitPublishPayload = (unitYaml: string, credentials: UnitCredential[]): string => {
+const hashUnitPublishPayload = (unitYaml: string, credentialFingerprint?: string): string => {
   const hash = createHash('sha256').update(unitYaml, 'utf8');
 
-  if (credentials.length > 0) {
-    // Distributor stores `config_hash` without recomputing it. Hashing
-    // credential ciphertext as well means a secret-only change still rolls
-    // out instead of matching the previous YAML-only hash and no-op'ing.
-    const fingerprint = [...credentials]
-      .sort((left, right) => left.name.localeCompare(right.name))
-      .map(({ name, ciphertext }) => [name, ciphertext]);
+  if (credentialFingerprint) {
+    // Distributor stores `config_hash` without recomputing it. Folding the
+    // credential fingerprint in means a secret-only change still rolls out
+    // instead of matching the previous YAML-only hash and no-op'ing. It is the
+    // fingerprint rather than the ciphertext because AES-GCM re-seals an
+    // unchanged secret to different bytes every time, which would make every
+    // publish look like a change and roll the collector for nothing.
     hash.update('\n');
-    hash.update(JSON.stringify(fingerprint));
+    hash.update(credentialFingerprint);
   }
 
   return hash.digest('hex');
@@ -217,13 +218,13 @@ export const createConfigDistributorClient = ({
   return {
     publish: async ({ unitId, unit, secrets }) => {
       const unitYaml = serializeUnitYaml(unit);
-      const credentials = await credentialsForPublish({
+      const { credentials, fingerprint } = await credentialsForPublish({
         unitId,
         secrets,
         encryptCredentials: hooks.encryptCredentials,
         logger,
       });
-      const configHash = hashUnitPublishPayload(unitYaml, credentials);
+      const configHash = hashUnitPublishPayload(unitYaml, fingerprint);
 
       logger.debug(`Publishing Streams unit [${unitId}] to config distributor`);
 
@@ -280,9 +281,9 @@ const credentialsForPublish = async ({
   secrets: StreamsUnit.Secrets;
   encryptCredentials: UnitConfigHooks['encryptCredentials'];
   logger: Logger;
-}): Promise<UnitCredential[]> => {
+}): Promise<{ credentials: UnitCredential[]; fingerprint?: string }> => {
   if (Object.keys(secrets).length === 0) {
-    return [];
+    return { credentials: [] };
   }
 
   // Project-key encryption is not wired yet. Keep the unit publish working and
@@ -292,7 +293,7 @@ const credentialsForPublish = async ({
     logger.warn(
       `Project-key encryption is not configured; publishing Streams unit [${unitId}] without a credentials sidecar.`
     );
-    return [];
+    return { credentials: [] };
   }
 
   return encryptSecretsForDistributor(encryptCredentials, secrets);
@@ -301,29 +302,26 @@ const credentialsForPublish = async ({
 const encryptSecretsForDistributor = async (
   encryptCredentials: UnitConfigHooks['encryptCredentials'],
   secrets: StreamsUnit.Secrets
-): Promise<UnitCredential[]> => {
+): Promise<SealedCredentials> => {
   if (!encryptCredentials) {
-    throw new StatusError(
-      'Cannot publish Streams unit credentials: project-key encryption is not configured.',
-      503
-    );
+    throw credentialSealingUnavailable();
   }
 
-  const credentials = await encryptCredentials(secrets);
+  const sealed = await encryptCredentials(secrets);
   const secretNames = Object.keys(secrets).sort();
-  const credentialNames = credentials.map((credential) => credential.name).sort();
+  const credentialNames = sealed.credentials.map((credential) => credential.name).sort();
 
   if (
     secretNames.length !== credentialNames.length ||
     secretNames.some((name, index) => name !== credentialNames[index])
   ) {
     throw new StatusError(
-      'Cannot publish Streams unit credentials: encryption did not return one ciphertext per secret.',
+      'Cannot publish Streams unit credentials: sealing did not return one blob per secret.',
       500
     );
   }
 
-  return credentials;
+  return sealed;
 };
 
 const statusErrorFromDistributorResponse = (

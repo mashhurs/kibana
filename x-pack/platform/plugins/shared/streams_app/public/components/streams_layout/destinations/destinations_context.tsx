@@ -39,6 +39,8 @@ export interface DestinationsController {
   destinationNameError?: DestinationNameValidationError;
   elasticsearchIndex: string;
   elasticsearchIndexPatterns: string;
+  elasticsearchEndpoint: string;
+  elasticsearchApiKey: string;
   indexError?: 'required';
   indexPatternsError?: 'required' | 'invalid';
   canCreateDestination: boolean;
@@ -52,6 +54,8 @@ export interface DestinationsController {
   setCreateDestinationName: (destinationName: string) => void;
   setElasticsearchIndex: (index: string) => void;
   setElasticsearchIndexPatterns: (indexPatterns: string) => void;
+  setElasticsearchEndpoint: (endpoint: string) => void;
+  setElasticsearchApiKey: (apiKey: string) => void;
   validateCreationForm: () => void;
   deleteDestination: (destinationId: string) => void;
   setQuery: (query: string) => void;
@@ -197,6 +201,11 @@ export const useDestinations = ({
   const elasticsearchIndexPatterns =
     creationContext?.formData.elasticsearch.indexPatterns ??
     EMPTY_ELASTICSEARCH_DESTINATION_FORM.indexPatterns;
+  const elasticsearchEndpoint =
+    creationContext?.formData.elasticsearch.endpoint ??
+    EMPTY_ELASTICSEARCH_DESTINATION_FORM.endpoint;
+  const elasticsearchApiKey =
+    creationContext?.formData.elasticsearch.apiKey ?? EMPTY_ELASTICSEARCH_DESTINATION_FORM.apiKey;
   const indexError = creationContext?.formErrors.index;
   const indexPatternsError = creationContext?.formErrors.indexPatterns;
   const isCreatingDestination = useSelector(destinationsActorRef, (state) =>
@@ -251,6 +260,14 @@ export const useDestinations = ({
       destinationsActorRef.send({ type: 'elasticsearch.change', indexPatterns }),
     [destinationsActorRef]
   );
+  const setElasticsearchEndpoint = useCallback(
+    (endpoint: string) => destinationsActorRef.send({ type: 'elasticsearch.change', endpoint }),
+    [destinationsActorRef]
+  );
+  const setElasticsearchApiKey = useCallback(
+    (apiKey: string) => destinationsActorRef.send({ type: 'elasticsearch.change', apiKey }),
+    [destinationsActorRef]
+  );
   const validateCreationForm = useCallback(
     () => destinationsActorRef.send({ type: 'creationForm.blur' }),
     [destinationsActorRef]
@@ -278,6 +295,8 @@ export const useDestinations = ({
       destinationNameError,
       elasticsearchIndex,
       elasticsearchIndexPatterns,
+      elasticsearchEndpoint,
+      elasticsearchApiKey,
       indexError,
       indexPatternsError,
       canCreateDestination,
@@ -293,6 +312,8 @@ export const useDestinations = ({
       setCreateDestinationName,
       setElasticsearchIndex,
       setElasticsearchIndexPatterns,
+      setElasticsearchEndpoint,
+      setElasticsearchApiKey,
       validateCreationForm,
       deleteDestination,
       setQuery: (nextQuery: string) => {
@@ -313,6 +334,8 @@ export const useDestinations = ({
       destinationViews,
       elasticsearchIndex,
       elasticsearchIndexPatterns,
+      elasticsearchEndpoint,
+      elasticsearchApiKey,
       indexError,
       indexPatternsError,
       destinationsActorRef,
@@ -327,6 +350,8 @@ export const useDestinations = ({
       setCreateDestinationName,
       setElasticsearchIndex,
       setElasticsearchIndexPatterns,
+      setElasticsearchEndpoint,
+      setElasticsearchApiKey,
       setStorageKind,
       storageKind,
       tableState,

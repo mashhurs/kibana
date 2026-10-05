@@ -27,9 +27,14 @@ export const createSourceEnvironmentLoader =
     } catch {
       elasticsearchBaseUrl = undefined;
     }
+    // Local dev fallback: cloud ES URL is unavailable outside Cloud environments.
+    elasticsearchBaseUrl ??= 'http://localhost:9200';
+
+    // Local dev fallback: managed OTLP URL is unavailable outside Cloud environments.
+    const managedInputBaseUrl = cloud?.managedOtlp?.url ?? 'http://localhost:4317';
 
     return {
-      managedInputBaseUrl: cloud?.managedOtlp?.url,
+      managedInputBaseUrl,
       elasticsearchBaseUrl,
       isCloudEnabled: cloud?.isCloudEnabled ?? false,
       isServerless,

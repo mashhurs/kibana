@@ -83,6 +83,7 @@ export const toDestinationViewModel = (
     type: LOCAL_ELASTICSEARCH_TYPE,
     index,
     indexPatterns: readDestinationIndexPatterns(destination, index),
+    endpoint: readConfigString(destination, 'endpoint') ?? '',
   };
 };
 
@@ -96,22 +97,33 @@ export const getConfiguredDestinations = (unit: Unit): DestinationViewModel[] =>
  * Local Elasticsearch destination matching streams-spec `elasticsearch.schema.yaml`.
  * `index` is required. `index_patterns` is written when the index is a template
  * (`{{`) or the user supplied patterns. A static index omits the entry so the
- * spec default of `[index]` applies.
+ * spec default of `[index]` applies. `endpoint` and `api_key` are optional
+ * config entries; omitting them means the collector uses cluster-wide env vars.
  */
 export const createUnitDestination = ({
   id,
   name,
   index,
   indexPatterns,
+  endpoint,
+  apiKey,
 }: {
   id: string;
   name: string;
   index: string;
   indexPatterns: string[];
+  endpoint?: string;
+  apiKey?: string;
 }): UnitDestination => {
   const config: NonNullable<UnitDestination['config']> = [{ name: 'index', value: index }];
   if (indexUsesTemplate(index) || indexPatterns.length > 0) {
     config.push({ name: 'index_patterns', value: indexPatterns });
+  }
+  if (endpoint) {
+    config.push({ name: 'endpoint', value: endpoint });
+  }
+  if (apiKey) {
+    config.push({ name: 'api_key', value: apiKey });
   }
   return {
     id,

@@ -28,6 +28,8 @@ export interface DestinationViewModel {
    * Static indexes that omit the entry surface the spec default of `[index]`.
    */
   indexPatterns: string[];
+  /** Custom Elasticsearch endpoint URL; empty when using the cluster default. */
+  endpoint: string;
 }
 
 /** Per-type form state. Each destination type owns its own slice. */
@@ -35,6 +37,10 @@ export interface ElasticsearchDestinationFormData {
   index: string;
   /** Raw index patterns, one per line or comma-separated. */
   indexPatterns: string;
+  /** Custom Elasticsearch endpoint URL; empty means use the cluster default. */
+  endpoint: string;
+  /** API key for the destination; stored as a secret, not in the unit YAML. */
+  apiKey: string;
 }
 
 export interface DestinationCreationFormData {
@@ -52,4 +58,6 @@ export interface DestinationCreationFormErrors {
 export const EMPTY_ELASTICSEARCH_DESTINATION_FORM: ElasticsearchDestinationFormData = {
   index: '',
   indexPatterns: '',
+  endpoint: '',
+  apiKey: '',
 };

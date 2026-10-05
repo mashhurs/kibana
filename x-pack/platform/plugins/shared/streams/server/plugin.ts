@@ -57,8 +57,11 @@ import { createStreamsSettingsStorageClient } from './lib/streams/storage/stream
 import { registerSuggestionsInferenceFeatures } from './register_suggestions_inference_features';
 import type { AttachmentClient } from './lib/streams/attachments/attachment_client';
 import { registerStreamsSavedObjects } from './lib/saved_objects/register_saved_objects';
+import type { CloudSetup } from '@kbn/cloud-plugin/server';
 import { createConfigDistributorClient } from './lib/unit_config/config_distributor_client';
-import type { UnitConfigHooks } from './lib/unit_config/types';
+import { createCredentialSealer } from './lib/unit_config/seal_credentials';
+import { createWrapKeyStore } from './lib/unit_config/wrap_key_store';
+import type { EncryptUnitCredentials, UnitConfigHooks } from './lib/unit_config/types';
 
 const STREAMS_MANAGED_WORKFLOW_OWNER = 'streams';
 const STREAMS_ALLOWED_PROJECT_TYPES = ['observability', 'security'];
@@ -300,13 +303,16 @@ export class StreamsPlugin
     registerFeatureFlags(core);
     core.pricing.registerProductFeatures(STREAMS_TIERED_FEATURES);
 
-    // `encryptCredentials` is the distributor sidecar transform (project public
-    // key → `credentials[]`). It is not wired until the project public key is
-    // available. Publish then omits the credentials sidecar instead of sending
-    // plaintext or failing the unit write. At-rest encryption is Encrypted Saved Objects.
+    // `encryptCredentials` seals each secret under the project wrap key into
+    // the `credentials[]` sidecar. Unset when no wrap key is mounted, in which
+    // case publish with non-empty secrets fails rather than sending plaintext.
+    // At-rest encryption remains Encrypted Saved Objects.
     const unitConfigHooks: UnitConfigHooks = createConfigDistributorClient({
       config: this.config.distributor,
       logger: this.logger.get('config-distributor'),
+      hooks: {
+        encryptCredentials: this.createCredentialSealer(plugins.cloud),
+      },
     });
 
     const routeRegistrationOptions = {
@@ -487,6 +493,38 @@ export class StreamsPlugin
         });
       },
     };
+  }
+
+  /**
+   * Builds the credential seal, or returns `undefined` when this deployment
+   * cannot seal. Leaving the hook unset is deliberate: the distributor client
+   * then rejects a publish that carries secrets, which is the behaviour we
+   * want over shipping plaintext or a blob nothing can open.
+   */
+  private createCredentialSealer(cloud?: CloudSetup): EncryptUnitCredentials | undefined {
+    const { path, targetId: configuredTargetId } = this.config.wrapKey;
+    const logger = this.logger.get('credential-seal');
+
+    if (!path) {
+      return undefined;
+    }
+
+    // Must match the `target_id` the distributor derives from Kibana's client
+    // certificate, because that is what the unit collector unwraps against.
+    const targetId = configuredTargetId ?? cloud?.serverless?.projectId;
+
+    if (!targetId) {
+      logger.error(
+        'xpack.streams.wrapKey.path is set but the project id is unknown, so sealed credentials cannot be bound to a project. Set xpack.streams.wrapKey.targetId.'
+      );
+      return undefined;
+    }
+
+    return createCredentialSealer({
+      store: createWrapKeyStore({ path }),
+      targetId,
+      logger,
+    });
   }
 
   public start(core: CoreStart, plugins: StreamsPluginStartDependencies): StreamsPluginStart {

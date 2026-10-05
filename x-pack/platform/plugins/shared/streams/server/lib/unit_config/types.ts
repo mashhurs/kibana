@@ -9,12 +9,41 @@ import type { StreamsUnit } from '@kbn/streams-schema';
 
 /**
  * One credential as the config-distributor `PUT /v1/units/{id}` sidecar expects:
- * a name referenced from authored unit YAML, and ciphertext under the project
- * public key. Plaintext never appears in `unit_yaml`.
+ * a name referenced from authored unit YAML, plus the sealed blob
+ * `{kid, iv, ciphertext}` agreed in elastic/infosec#28583. Plaintext never
+ * appears in `unit_yaml`, and neither the distributor nor streams-controller
+ * can open the blob — only the unit collector, which mounts the same wrap key.
  */
 export interface UnitCredential {
   name: string;
+  /**
+   * Identifies the wrap-key slot this blob was sealed under, so the collector
+   * can unwrap by `kid` across a rotation (`current` or `previous`).
+   */
+  kid: string;
+  /** Base64 96-bit AES-GCM nonce. Fresh per credential per seal. */
+  iv: string;
+  /**
+   * Base64 AES-256-GCM ciphertext with the 16-byte authentication tag
+   * appended, which is what Go's `cipher.AEAD.Open` expects on the unwrap side.
+   */
   ciphertext: string;
+}
+
+/**
+ * The outcome of sealing a unit's secrets: one blob per secret, and a
+ * fingerprint of the sealed *plaintext*.
+ *
+ * `config_hash` has to cover the secrets so a secret-only edit still rolls out,
+ * but it cannot be computed over the ciphertext: AES-GCM is randomized, so
+ * re-sealing an unchanged secret produces different bytes every time and every
+ * publish would look like a change, rolling the collector Deployment for
+ * nothing. The fingerprint is stable for unchanged plaintext under the same
+ * `kid`, which keeps the distributor's `unchanged` hash gate working.
+ */
+export interface SealedCredentials {
+  credentials: UnitCredential[];
+  fingerprint: string;
 }
 
 export interface PublishUnitConfigParams {
@@ -25,7 +54,9 @@ export interface PublishUnitConfigParams {
 
 export type PublishUnitConfig = (params: PublishUnitConfigParams) => Promise<void>;
 
-export type EncryptUnitCredentials = (secrets: StreamsUnit.Secrets) => Promise<UnitCredential[]>;
+export type EncryptUnitCredentials = (
+  secrets: StreamsUnit.Secrets
+) => Promise<SealedCredentials>;
 
 /**
  * Result of config-distributor `POST /v1/validate` when the unit compiles.
@@ -54,10 +85,14 @@ export interface UnitConfigHooks {
    */
   publish?: PublishUnitConfig;
   /**
-   * Outbound transform: encrypt each named secret under the project public
-   * key for the distributor `credentials[]` sidecar. Does not rewrite `unit`.
-   * Kibana at-rest protection is Encrypted Saved Objects on `secrets`.
-   * TODO: Needs implementation once we can hook up the encryption with the project key.
+   * Outbound transform: seal each named secret under the project wrap key for
+   * the distributor `credentials[]` sidecar. Does not rewrite `unit`. Kibana
+   * at-rest protection is Encrypted Saved Objects on `secrets`; this is the
+   * separate in-flight protection, since the distributor and
+   * streams-controller do not read ESO and must never see plaintext.
+   *
+   * Unset when `xpack.streams.wrapKey.path` is not configured, in which case
+   * publishing a unit that has secrets fails rather than sending plaintext.
    */
   encryptCredentials?: EncryptUnitCredentials;
 }
